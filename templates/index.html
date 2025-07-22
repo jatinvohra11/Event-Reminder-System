@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗓️ Event Reminder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <header>
+        <h1>🗓️ Welcome, {{ current_user.username }}!</h1>
+        <div class="header-controls">
+             <a href="{{ url_for('calendar') }}" class="nav-link">Calendar View</a>
+             <button id="toggle-dark-mode">Toggle Dark Mode</button>
+             <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <section id="events-section">
+            <div class="events-header">
+                <h2>Your Events</h2>
+                <div class="filter-container">
+                    <form action="{{ url_for('index') }}" method="GET" class="search-form">
+                        <input type="text" name="search" placeholder="Search by title..." value="{{ search_term or '' }}">
+                        <button type="submit"><i class="fa fa-search"></i></button>
+                    </form>
+                    <div class="category-filters">
+                        <a href="{{ url_for('index') }}" class="filter-link {{ 'active' if not category_filter }}">All</a>
+                        <a href="{{ url_for('index', category='Personal') }}" class="filter-link {{ 'active' if category_filter == 'Personal' }}">Personal</a>
+                        <a href="{{ url_for('index', category='Work') }}" class="filter-link {{ 'active' if category_filter == 'Work' }}">Work</a>
+                        <a href="{{ url_for('index', category='Urgent') }}" class="filter-link {{ 'active' if category_filter == 'Urgent' }}">Urgent</a>
+                        <a href="{{ url_for('index', category='Shopping') }}" class="filter-link {{ 'active' if category_filter == 'Shopping' }}">Shopping</a>
+                    </div>
+                </div>
+            </div>
+
+            {% for event in events %}
+            <div class="event-card" data-datetime="{{ event.event_date.isoformat() }}T{{ event.event_time.isoformat() }}">
+                <div class="event-content">
+                    <div class="event-header">
+                        <h3 class="event-title">{{ event.title }}</h3>
+                        <span class="category-badge category-{{ event.category|lower }}">{{ event.category }}</span>
+                    </div>
+                    <p class="event-description">{{ event.description }}</p>
+                    <div class="event-details">
+                        <span><i class="fas fa-calendar-alt"></i> {{ event.event_date.strftime('%Y-%m-%d') }}</span>
+                        <span><i class="fas fa-clock"></i> {{ event.event_time.strftime('%H:%M') }}</span>
+                    </div>
+                </div>
+                <div class="card-controls">
+                    <button class="edit-btn" 
+                            data-id="{{ event.id }}"
+                            data-title="{{ event.title }}"
+                            data-description="{{ event.description }}"
+                            data-category="{{ event.category }}"
+                            data-date="{{ event.event_date.strftime('%Y-%m-%d') }}"
+                            data-time="{{ event.event_time.strftime('%H:%M') }}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <form action="{{ url_for('delete', event_id=event.id) }}" method="post">
+                        <button type="submit" class="delete-btn" aria-label="Delete Event">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+              <div class="no-events-message">
+                  {% if search_term or category_filter %}
+                  <p>No events found for your search/filter.</p>
+                  <a href="{{ url_for('index') }}">Clear Search & Filter</a>
+                  {% else %}
+                  <p>No upcoming events. Add one using the form!</p>
+                  {% endif %}
+              </div>
+            {% endfor %}
+        </section>
+
+        <aside id="form-section">
+            <h2>Add New Event</h2>
+            <form action="{{ url_for('add') }}" method="post">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" name="description">
+                </div>
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category" name="category">
+                        <option value="Personal">Personal</option>
+                        <option value="Work">Work</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Shopping">Shopping</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="time">Time</label>
+                    <input type="time" id="time" name="time" required>
+                </div>
+                <button type="submit" class="submit-btn">Add Event</button>
+            </form>
+        </aside>
+    </main>
+
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Edit Event</h2>
+            <form id="edit-form" method="POST" action="">
+                <div class="form-group">
+                    <label for="edit-title">Title</label>
+                    <input type="text" id="edit-title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-description">Description</label>
+                    <input type="text" id="edit-description" name="description">
+                </div>
+                <div class="form-group">
+                    <label for="edit-category">Category</label>
+                    <select id="edit-category" name="category">
+                        <option value="Personal">Personal</option>
+                        <option value="Work">Work</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Shopping">Shopping</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-date">Date</label>
+                    <input type="date" id="edit-date" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-time">Time</label>
+                    <input type="time" id="edit-time" name="time" required>
+                </div>
+                <button type="submit" class="submit-btn">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('toggle-dark-mode').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+        });
+
+        const modal = document.getElementById('edit-modal');
+        if (modal) {
+            const closeBtn = document.querySelector('.close-btn');
+            const editForm = document.getElementById('edit-form');
+            const editTitle = document.getElementById('edit-title');
+            const editDescription = document.getElementById('edit-description');
+            const editCategory = document.getElementById('edit-category');
+            const editDate = document.getElementById('edit-date');
+            const editTime = document.getElementById('edit-time');
+
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const id = button.dataset.id;
+                    const title = button.dataset.title;
+                    const description = button.dataset.description;
+                    const category = button.dataset.category;
+                    const date = button.dataset.date;
+                    const time = button.dataset.time;
+
+                    editForm.action = `/edit/${id}`;
+                    editTitle.value = title;
+                    editDescription.value = description;
+                    editCategory.value = category;
+                    editDate.value = date;
+                    editTime.value = time;
+                    modal.style.display = 'block';
+                });
+            });
+
+            const closeModal = () => {
+                modal.style.display = 'none';
+            };
+
+            closeBtn.addEventListener('click', closeModal);
+
+            window.addEventListener('click', (event) => {
+                if (event.target == modal) {
+                    closeModal();
+                }
+            });
+        }
+
+        // ✅ NEW: Sound Notification Logic
+        const notificationSound = new Audio("{{ url_for('static', filename='sounds/notification.mp3') }}");
+
+        setInterval(() => {
+            const allEvents = document.querySelectorAll('.event-card');
+            const now = new Date();
+
+            allEvents.forEach(eventCard => {
+                const eventDateTimeStr = eventCard.dataset.datetime;
+                const eventTime = new Date(eventDateTimeStr);
+
+                // Check if the event time has passed and if it hasn't been notified yet
+                if (eventTime <= now && !eventCard.classList.contains('notified')) {
+                    console.log(`Event ${eventCard.querySelector('.event-title').innerText} has passed!`);
+                    
+                    // Play the sound
+                    notificationSound.play().catch(error => {
+                        console.log("Audio play was prevented by the browser. User interaction might be needed.", error);
+                    });
+
+                    // Add 'notified' class to play the sound only once and add visual effect
+                    eventCard.classList.add('notified');
+                }
+            });
+        }, 5000); // Check every 5 seconds
+
+    </script>
+</body>
+</html>
